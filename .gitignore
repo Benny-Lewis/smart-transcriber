@@ -1,0 +1,51 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+*.egg
+dist/
+build/
+*.whl
+.eggs/
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Audio files
+*.m4a
+*.wav
+*.ogg
+*.mp3
+*.mp4
+*.aac
+*.flac
+*.opus
+*.webm
+*.mov
+*.mkv
+*.aiff
+*.aif
+*.caf
+*.wma
+
+# Generated outputs
+notes.md
+notes.json
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test / coverage
+.pytest_cache/
+.coverage
+htmlcov/
