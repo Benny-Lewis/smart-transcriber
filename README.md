@@ -1,11 +1,11 @@
-# audio-transcriber
+# audioscribe
 
 Transcribe meeting audio and generate structured notes using OpenAI APIs.
 
 ## Install
 
 ```bash
-pip install audio-transcriber
+pip install audioscribe
 ```
 
 ## Quick Start
