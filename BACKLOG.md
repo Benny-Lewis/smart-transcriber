@@ -1,6 +1,6 @@
 # Backlog
 
-Post-MVP ideas for audio-transcriber. Items roughly ordered by expected value.
+Post-MVP ideas for smart-transcriber. Items roughly ordered by expected value.
 
 ## Near-term
 
@@ -10,7 +10,7 @@ Post-MVP ideas for audio-transcriber. Items roughly ordered by expected value.
 - [ ] `--verbose` / `--quiet` flags (convert print() to logging module)
 - [ ] Progress indicators for long transcriptions
 - [ ] `py.typed` marker + mypy enforcement
-- [ ] Config file support (`~/.audio-transcriber.toml`)
+- [ ] Config file support (`~/.smart-transcriber.toml`)
 - [ ] Mocked API integration tests
 - [ ] JSON schema versioning for intermediate transcript format
 
