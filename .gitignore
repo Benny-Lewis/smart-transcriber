@@ -37,9 +37,20 @@ ENV/
 *.caf
 *.wma
 
-# Generated outputs
+# Generated transcription outputs
+# (only track README.md, CHANGELOG.md, BACKLOG.md by name)
+New Recording*.md
+ns-all-hands-*.md
+v1-*.md
+test*.md
 notes.md
 notes.json
+
+# Claude Code
+.claude/
+
+# Internal design docs
+docs/
 
 # OS
 .DS_Store
