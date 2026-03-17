@@ -1,6 +1,6 @@
-"""Tests for audio_transcriber.transcribe."""
+"""Tests for smart_transcriber.transcribe."""
 
-from audio_transcriber.transcribe import (
+from smart_transcriber.transcribe import (
     merge_display_segments,
     merge_transcripts,
     normalize_response,

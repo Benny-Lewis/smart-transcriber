@@ -1,8 +1,8 @@
-"""Tests for audio_transcriber.analyze."""
+"""Tests for smart_transcriber.analyze."""
 
 import json
 
-from audio_transcriber.analyze import AnalysisResult, build_analysis_prompt
+from smart_transcriber.analyze import AnalysisResult, build_analysis_prompt
 
 
 class TestAnalysisResultTypedDict:

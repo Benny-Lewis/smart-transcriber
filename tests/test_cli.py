@@ -1,4 +1,4 @@
-"""CLI smoke tests for audio_transcriber."""
+"""CLI smoke tests for smart_transcriber."""
 
 import os
 import subprocess
@@ -8,7 +8,7 @@ import sys
 def run_cli(*args: str, env: dict | None = None) -> subprocess.CompletedProcess:
     run_env = env if env is not None else os.environ.copy()
     return subprocess.run(
-        [sys.executable, "-m", "audio_transcriber.cli", *args],
+        [sys.executable, "-m", "smart_transcriber.cli", *args],
         capture_output=True,
         text=True,
         env=run_env,

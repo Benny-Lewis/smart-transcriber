@@ -12,11 +12,11 @@ from typing import Any, Dict, List
 
 from openai import OpenAI
 
-from audio_transcriber import __version__
-from audio_transcriber.analyze import analyze_transcript
-from audio_transcriber.render import render_markdown, render_outline_markdown
-from audio_transcriber.transcribe import call_transcription, merge_transcripts, split_audio_ffmpeg
-from audio_transcriber.utils import (
+from smart_transcriber import __version__
+from smart_transcriber.analyze import analyze_transcript
+from smart_transcriber.render import render_markdown, render_outline_markdown
+from smart_transcriber.transcribe import call_transcription, merge_transcripts, split_audio_ffmpeg
+from smart_transcriber.utils import (
     DEFAULT_AUDIO_EXTS,
     DEFAULT_CHUNK_SECONDS,
     MAX_UPLOAD_BYTES,

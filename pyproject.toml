@@ -22,18 +22,18 @@ classifiers = [
 keywords = ["transcription", "meeting-notes", "openai", "whisper", "audio"]
 
 [project.urls]
-Homepage = "https://github.com/benny-lewis/audio-transcriber"
-Repository = "https://github.com/benny-lewis/audio-transcriber"
-Issues = "https://github.com/benny-lewis/audio-transcriber/issues"
+Homepage = "https://github.com/benny-lewis/smart-transcriber"
+Repository = "https://github.com/benny-lewis/smart-transcriber"
+Issues = "https://github.com/benny-lewis/smart-transcriber/issues"
 
 [project.scripts]
-transcribe = "audio_transcriber.cli:main"
+transcribe = "smart_transcriber.cli:main"
 
 [tool.hatch.version]
-path = "src/audio_transcriber/__init__.py"
+path = "src/smart_transcriber/__init__.py"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/audio_transcriber"]
+packages = ["src/smart_transcriber"]
 
 [project.optional-dependencies]
 dev = ["pytest>=7.0"]

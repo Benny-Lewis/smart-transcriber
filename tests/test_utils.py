@@ -1,8 +1,8 @@
-"""Tests for audio_transcriber.utils."""
+"""Tests for smart_transcriber.utils."""
 
 import pytest
 
-from audio_transcriber.utils import (
+from smart_transcriber.utils import (
     DEFAULT_AUDIO_EXTS,
     DEFAULT_CHUNK_SECONDS,
     MAX_UPLOAD_BYTES,

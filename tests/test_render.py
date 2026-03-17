@@ -1,6 +1,6 @@
-"""Tests for audio_transcriber.render."""
+"""Tests for smart_transcriber.render."""
 
-from audio_transcriber.render import (
+from smart_transcriber.render import (
     build_annotated_transcript_lines,
     filter_participants,
     format_list,

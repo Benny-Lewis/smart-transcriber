@@ -10,8 +10,8 @@ from __future__ import annotations
 import re
 from typing import Any, Dict, List
 
-from audio_transcriber.transcribe import merge_display_segments
-from audio_transcriber.utils import (
+from smart_transcriber.transcribe import merge_display_segments
+from smart_transcriber.utils import (
     format_annotation_timestamp,
     format_time_of_day,
     format_timestamp,
