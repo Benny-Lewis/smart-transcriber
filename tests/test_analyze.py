@@ -56,3 +56,30 @@ class TestBuildAnalysisPrompt:
         payload = {"audio_file": "x", "duration_seconds": 0,
                    "num_speakers_hint": None, "transcript_text": "", "segments": []}
         assert isinstance(build_analysis_prompt(payload), str)
+
+    def test_transcript_only_includes_speaker_keys(self):
+        payload = {
+            "audio_file": "test.mp3",
+            "duration_seconds": 60.0,
+            "num_speakers_hint": None,
+            "transcript_text": "Hello",
+            "segments": [{"index": 0, "start": 0.0, "end": 1.0, "text": "Hello"}],
+        }
+        result = build_analysis_prompt(payload, transcript_only=True)
+        assert "speakers" in result
+        assert "segment_speakers" in result
+
+    def test_transcript_only_excludes_full_analysis_keys(self):
+        payload = {
+            "audio_file": "test.mp3",
+            "duration_seconds": 60.0,
+            "num_speakers_hint": None,
+            "transcript_text": "Hello",
+            "segments": [{"index": 0, "start": 0.0, "end": 1.0, "text": "Hello"}],
+        }
+        result = build_analysis_prompt(payload, transcript_only=True)
+        assert "summary" not in result
+        assert "sections" not in result
+        assert "decisions" not in result
+        assert "action_items" not in result
+        assert "annotations" not in result

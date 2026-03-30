@@ -22,7 +22,26 @@ class AnalysisResult(TypedDict, total=False):
     segment_speakers: List[Dict[str, Any]]
 
 
-def build_analysis_prompt(payload: Dict[str, Any]) -> str:
+def build_analysis_prompt(
+    payload: Dict[str, Any],
+    transcript_only: bool = False,
+) -> str:
+    if transcript_only:
+        return (
+            "You are a careful meeting analyst. Use only the provided transcript data. "
+            "Do not invent facts or speakers. If unsure, use null or empty lists. "
+            "Return a JSON object with these keys:\n"
+            "speakers: list of {label, notes}\n"
+            "segment_speakers: list of {segment_index, speaker}\n\n"
+            "Prefer generic speaker labels like 'Speaker 1' unless the transcript "
+            "explicitly identifies names. Keep notes short.\n"
+            "If there are many speakers (e.g., town hall), assign unique labels "
+            "such as 'Speaker 1', 'Speaker 2', or 'Audience 1', 'Audience 2', etc. "
+            "Reuse labels consistently for the same voice across segments.\n\n"
+            "For segment_speakers, use the segment_index values from input segments and "
+            "only assign speakers; do not rewrite or paraphrase the text.\n\n"
+            f"Input JSON:\n{json.dumps(payload, ensure_ascii=True)}"
+        )
     return (
         "You are a careful meeting analyst. Use only the provided transcript data. "
         "Do not invent facts, speakers, or decisions. If unsure, use null or empty lists. "
@@ -55,8 +74,9 @@ def analyze_transcript(
     client: OpenAI,
     model: str,
     payload: Dict[str, Any],
+    transcript_only: bool = False,
 ) -> AnalysisResult:
-    prompt = build_analysis_prompt(payload)
+    prompt = build_analysis_prompt(payload, transcript_only=transcript_only)
     response = client.chat.completions.create(
         model=model,
         response_format={"type": "json_object"},

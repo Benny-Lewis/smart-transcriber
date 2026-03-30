@@ -32,3 +32,8 @@ class TestCliSmoke:
         result = run_cli("nonexistent.mp3", env=env)
         assert result.returncode == 1
         assert "OPENAI_API_KEY" in result.stderr
+
+    def test_style_transcript_with_no_analysis_exits_one(self):
+        result = run_cli("nonexistent.mp3", "--style", "transcript", "--no-analysis")
+        assert result.returncode == 1
+        assert "cannot combine" in result.stderr.lower()

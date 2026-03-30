@@ -1,8 +1,8 @@
-"""Markdown rendering for report and outline styles.
+"""Markdown rendering for report, outline, and transcript styles.
 
-render_markdown() and render_outline_markdown() are independent entry points.
-Both share format_list(), build_annotated_transcript_lines(), and
-append_outline_sections(). No cross-calling between styles.
+render_markdown(), render_outline_markdown(), and render_transcript_markdown()
+are independent entry points. All share build_annotated_transcript_lines().
+Report and outline also share format_list() and append_outline_sections().
 """
 
 from __future__ import annotations
@@ -301,6 +301,40 @@ def render_markdown(
         append_outline_sections(lines, analysis)
 
     lines.append("## Annotated Transcript")
+    lines.extend(
+        build_annotated_transcript_lines(
+            analysis,
+            transcript_text,
+            segments,
+            start_time_seconds,
+            merge_gap_seconds,
+            max_merge_seconds,
+            max_merge_words,
+        )
+    )
+    lines.append("")
+
+    return "\n".join(lines)
+
+
+def render_transcript_markdown(
+    analysis: Dict[str, Any],
+    transcript_text: str,
+    segments: List[Dict[str, Any]],
+    start_time_seconds: int | None,
+    merge_gap_seconds: int,
+    max_merge_seconds: int,
+    max_merge_words: int,
+    disclaimer: str | None,
+) -> str:
+    lines: List[str] = []
+    lines.append("# Transcript")
+    lines.append("")
+
+    if disclaimer:
+        lines.append(f"> {normalize_text_ascii(disclaimer)}")
+        lines.append("")
+
     lines.extend(
         build_annotated_transcript_lines(
             analysis,

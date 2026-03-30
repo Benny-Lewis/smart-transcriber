@@ -6,6 +6,7 @@ from smart_transcriber.render import (
     format_list,
     render_markdown,
     render_outline_markdown,
+    render_transcript_markdown,
 )
 
 
@@ -211,3 +212,60 @@ class TestRenderOutlineMarkdown:
             None, 2, 45, 80, True, None,
         )
         assert "whisper-1" in md
+
+
+class TestRenderTranscriptMarkdown:
+    ANALYSIS = {
+        "segment_speakers": [
+            {"segment_index": 0, "speaker": "Speaker 1"},
+            {"segment_index": 1, "speaker": "Speaker 2"},
+        ],
+        "speakers": [
+            {"label": "Speaker 1", "notes": "project lead"},
+            {"label": "Speaker 2", "notes": "engineer"},
+        ],
+    }
+    SEGMENTS = [
+        {"start": 0.0, "end": 5.0, "text": "Hello everyone"},
+        {"start": 6.0, "end": 10.0, "text": "Hi there"},
+    ]
+
+    def test_contains_transcript_heading(self):
+        md = render_transcript_markdown(
+            self.ANALYSIS, "Hello everyone Hi there", self.SEGMENTS,
+            None, 2, 45, 80, None,
+        )
+        assert "# Transcript" in md
+
+    def test_contains_speaker_labels(self):
+        md = render_transcript_markdown(
+            self.ANALYSIS, "Hello everyone Hi there", self.SEGMENTS,
+            None, 2, 45, 80, None,
+        )
+        assert "Speaker 1" in md
+        assert "Speaker 2" in md
+
+    def test_disclaimer(self):
+        md = render_transcript_markdown(
+            self.ANALYSIS, "Hello", self.SEGMENTS,
+            None, 2, 45, 80, "DRAFT",
+        )
+        assert "DRAFT" in md
+
+    def test_empty_analysis_falls_back_to_speaker(self):
+        md = render_transcript_markdown(
+            {}, "Hello everyone Hi there", self.SEGMENTS,
+            None, 2, 45, 80, None,
+        )
+        assert "Speaker:" in md
+
+    def test_no_summary_or_decisions_sections(self):
+        md = render_transcript_markdown(
+            self.ANALYSIS, "Hello", self.SEGMENTS,
+            None, 2, 45, 80, None,
+        )
+        assert "## Summary" not in md
+        assert "## Decisions" not in md
+        assert "## Action Items" not in md
+        assert "## Metadata" not in md
+        assert "## Key Points" not in md

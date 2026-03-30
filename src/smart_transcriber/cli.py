@@ -14,7 +14,7 @@ from openai import OpenAI
 
 from smart_transcriber import __version__
 from smart_transcriber.analyze import analyze_transcript
-from smart_transcriber.render import render_markdown, render_outline_markdown
+from smart_transcriber.render import render_markdown, render_outline_markdown, render_transcript_markdown
 from smart_transcriber.transcribe import call_transcription, merge_transcripts, split_audio_ffmpeg
 from smart_transcriber.utils import (
     DEFAULT_AUDIO_EXTS,
@@ -80,9 +80,9 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--style",
-        choices=["outline", "report"],
+        choices=["outline", "report", "transcript"],
         default="report",
-        help="Output style (default: report).",
+        help="Output style: report (full notes), outline (condensed), transcript (speaker-labeled transcript only). Default: report.",
     )
     parser.add_argument(
         "--include-metadata",
@@ -155,6 +155,14 @@ def main() -> int:
 
     if args.analysis_only and args.no_analysis:
         print("--analysis-only cannot be combined with --no-analysis.", file=sys.stderr)
+        return 1
+
+    if args.style == "transcript" and args.no_analysis:
+        print(
+            "--style transcript requires analysis for speaker labels; "
+            "cannot combine with --no-analysis.",
+            file=sys.stderr,
+        )
         return 1
 
     if args.analysis_only and not args.transcript_input:
@@ -291,7 +299,10 @@ def main() -> int:
         analysis = {}
     else:
         print("Analyzing transcript...")
-        analysis = analyze_transcript(client, args.analysis_model, payload)
+        analysis = analyze_transcript(
+            client, args.analysis_model, payload,
+            transcript_only=(args.style == "transcript"),
+        )
         print("Analysis complete.")
 
     meta = {
@@ -311,6 +322,17 @@ def main() -> int:
             args.max_merge_seconds,
             args.max_merge_words,
             args.include_metadata,
+            args.disclaimer,
+        )
+    elif args.style == "transcript":
+        markdown = render_transcript_markdown(
+            analysis,
+            transcript_text,
+            segments,
+            start_time_seconds,
+            args.merge_gap_seconds,
+            args.max_merge_seconds,
+            args.max_merge_words,
             args.disclaimer,
         )
     else:
