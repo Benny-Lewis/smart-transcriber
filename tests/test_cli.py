@@ -24,7 +24,8 @@ class TestCliSmoke:
     def test_version_exits_zero(self):
         result = run_cli("--version")
         assert result.returncode == 0
-        assert "0.1.0" in result.stdout
+        from smart_transcriber import __version__
+        assert __version__ in result.stdout
 
     def test_missing_api_key_exits_one(self):
         env = os.environ.copy()
