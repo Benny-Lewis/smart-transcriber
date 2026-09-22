@@ -127,7 +127,7 @@ class TestFormatAnnotationTimestamp:
 
 class TestConstants:
     def test_max_upload_bytes(self):
-        assert MAX_UPLOAD_BYTES == 26_214_400
+        assert MAX_UPLOAD_BYTES == 24_000_000
 
     def test_default_chunk_seconds(self):
         assert DEFAULT_CHUNK_SECONDS == 600

@@ -1,0 +1,6 @@
+interface:
+  display_name: "Audio Transcribe"
+  short_description: "Reviewable OpenAI transcription with speaker labels"
+  icon_small: "./assets/transcribe-small.svg"
+  icon_large: "./assets/transcribe.png"
+  default_prompt: "Use $transcribe to transcribe this recording with technical terminology and speaker labels, preserving reusable outputs and uncertainties."

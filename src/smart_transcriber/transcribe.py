@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import shutil
-import subprocess
 from pathlib import Path
 from typing import Any, Dict, List
 
@@ -22,7 +20,7 @@ def merge_display_segments(
         text = (seg.get("text") or "").strip()
         if not text:
             continue
-        speaker = speaker_map.get(idx) or "Speaker"
+        speaker = seg.get("speaker") or speaker_map.get(idx) or "Speaker"
         start = seg.get("start")
         end = seg.get("end")
 
@@ -38,11 +36,11 @@ def merge_display_segments(
             continue
 
         last = merged[-1]
-        same_speaker = last["speaker"] == speaker
+        same_speaker = last["speaker"] == speaker and speaker != "Speaker"
         last_end = last.get("end")
         gap_ok = False
         if last_end is not None and start is not None:
-            gap_ok = (start - last_end) <= merge_gap_seconds
+            gap_ok = 0 <= (start - last_end) <= merge_gap_seconds
 
         if same_speaker and gap_ok:
             candidate_text = f"{last['text']} {text}"
@@ -91,65 +89,94 @@ def normalize_response(obj: Any) -> Any:
 
 
 def select_transcribe_format(model: str) -> tuple[str, List[str] | None]:
-    if model.startswith("gpt-4o-mini-transcribe") or model.startswith("gpt-4o-transcribe"):
+    if model == "gpt-4o-transcribe-diarize":
+        return "diarized_json", None
+    if model in {
+        "gpt-transcribe", "gpt-4o-transcribe", "gpt-4o-mini-transcribe",
+        "gpt-4o-mini-transcribe-2025-12-15",
+    }:
         return "json", None
-    return "verbose_json", ["segment"]
+    if model == "whisper-1":
+        return "verbose_json", ["segment"]
+    raise ValueError(f"Unsupported transcription model: {model}. Check current capabilities before adding a model.")
 
 
-def split_audio_ffmpeg(audio_path: Path, chunk_seconds: int, output_dir: Path) -> List[Path]:
-    if not shutil.which("ffmpeg"):
-        raise RuntimeError("ffmpeg not found on PATH")
-    ext = audio_path.suffix or ".m4a"
-    pattern = output_dir / f"chunk_%03d{ext}"
-    cmd = [
-        "ffmpeg",
-        "-y",
-        "-i",
-        str(audio_path),
-        "-f",
-        "segment",
-        "-segment_time",
-        str(chunk_seconds),
-        "-reset_timestamps",
-        "1",
-        "-c",
-        "copy",
-        str(pattern),
-    ]
-    subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    chunks = sorted(output_dir.glob(f"chunk_*{ext}"))
-    if not chunks:
-        raise RuntimeError("ffmpeg produced no chunks")
-    return chunks
+def transcription_parameters(
+    model: str, language: str | None = None, prompt: str | None = None,
+    keywords: List[str] | None = None,
+    known_speakers: List[Dict[str, str]] | None = None,
+) -> Dict[str, Any]:
+    """Validate capabilities before opening/uploading audio. No unsupported hints are dropped."""
+    fmt, granularity = select_transcribe_format(model)
+    params: Dict[str, Any] = {"model": model, "response_format": fmt}
+    extra: Dict[str, Any] = {}
+    if model == "gpt-4o-transcribe-diarize":
+        if prompt or keywords:
+            raise ValueError("The diarization model does not support prompts or glossary terms; use meeting or text mode.")
+        params["chunking_strategy"] = "auto"
+    elif known_speakers:
+        raise ValueError("Known-speaker references require the diarization model.")
+    if keywords:
+        if model != "gpt-transcribe":
+            raise ValueError("Structured glossary terms require gpt-transcribe.")
+        if any(not term.strip() or any(c in term for c in "<>\r\n") for term in keywords):
+            raise ValueError("Glossary entries must be nonempty single lines without < or >.")
+        extra["keywords"] = keywords
+    if language and language != "auto":
+        if model == "gpt-transcribe":
+            extra["languages"] = [language]
+        else:
+            params["language"] = language
+    if prompt:
+        params["prompt"] = prompt
+    if known_speakers:
+        names = [s["name"] for s in known_speakers]
+        if len(names) > 4 or len(set(names)) != len(names):
+            raise ValueError("Provide at most four distinct known-speaker names.")
+        extra["known_speaker_names"] = names
+        extra["known_speaker_references"] = [s["data_url"] for s in known_speakers]
+    if extra:
+        params["extra_body"] = extra
+    if granularity:
+        params["timestamp_granularities"] = granularity
+    return params
 
 
 def merge_transcripts(
     transcripts: List[Dict[str, Any]],
     chunk_seconds: int,
+    *, offsets: List[float] | None = None,
+    known_names: List[str] | None = None,
 ) -> Dict[str, Any]:
     merged_text_parts: List[str] = []
     merged_segments: List[Dict[str, Any]] = []
-    offset = 0.0
-    for t in transcripts:
+    if offsets is not None and len(offsets) != len(transcripts):
+        raise ValueError("Each transcript needs its original audio offset.")
+    for chunk_index, t in enumerate(transcripts):
+        offset = offsets[chunk_index] if offsets is not None else float(chunk_index * chunk_seconds)
         text = (t.get("text") or "").strip()
         if text:
             merged_text_parts.append(text)
         segments = t.get("segments") or []
         if segments:
-            for seg in segments:
+            for seg_index, seg in enumerate(segments):
                 start = seg.get("start")
                 end = seg.get("end")
+                speaker = seg.get("speaker")
+                identity = {}
+                if speaker:
+                    identity = {"speaker": speaker, "speaker_source": "audio"}
+                    if len(transcripts) > 1 and speaker not in (known_names or []):
+                        identity.update(provider_speaker=speaker, speaker=f"chunk_{chunk_index + 1}:{speaker}")
                 merged_segments.append(
                     {
                         **seg,
+                        **identity,
+                        "id": f"chunk_{chunk_index + 1}:{seg.get('id', seg_index)}" if len(transcripts) > 1 else seg.get("id", str(seg_index)),
                         "start": (start + offset) if start is not None else start,
                         "end": (end + offset) if end is not None else end,
                     }
                 )
-            last_end = segments[-1].get("end")
-            offset += last_end if last_end is not None else float(chunk_seconds)
-        else:
-            offset += float(chunk_seconds)
     merged: Dict[str, Any] = {"text": "\n".join(merged_text_parts)}
     if merged_segments:
         merged["segments"] = merged_segments
@@ -162,21 +189,10 @@ def call_transcription(
     model: str,
     language: str | None,
     prompt: str | None,
+    *, keywords: List[str] | None = None,
+    known_speakers: List[Dict[str, str]] | None = None,
 ) -> Dict[str, Any]:
-    response_format, timestamp_granularities = select_transcribe_format(model)
-    params: Dict[str, Any] = {
-        "model": model,
-        "file": audio_path.open("rb"),
-        "response_format": response_format,
-    }
-    if timestamp_granularities:
-        params["timestamp_granularities"] = timestamp_granularities
-    if language:
-        params["language"] = language
-    if prompt:
-        params["prompt"] = prompt
-    try:
-        response = client.audio.transcriptions.create(**params)
+    params = transcription_parameters(model, language, prompt, keywords, known_speakers)
+    with audio_path.open("rb") as audio_file:
+        response = client.audio.transcriptions.create(file=audio_file, **params)
         return normalize_response(response)
-    finally:
-        params["file"].close()

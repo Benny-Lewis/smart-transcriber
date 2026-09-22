@@ -45,6 +45,11 @@ v1-*.md
 test*.md
 notes.md
 notes.json
+*.transcribe/
+*.transcript.json
+*.wording.txt
+*.review.md
+output/
 
 # Claude Code
 .claude/

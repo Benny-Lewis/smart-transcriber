@@ -1,110 +1,117 @@
 # smart-transcriber
 
-Transcribe meeting audio and generate structured notes using OpenAI APIs.
+OpenAI-only transcription for recorded interviews and meetings, with technical vocabulary hints, audio-derived speaker labels, reusable results, and optional analysis.
 
-## Install
+## Install from this checkout
 
-```bash
-pip install smart-transcriber
+Requires Python 3.11+, **ffmpeg and ffprobe on PATH**, and your existing `OPENAI_API_KEY` for uncached API work. No additional provider account is required.
+
+```powershell
+python -m pip install -e '.[dev]'
+python -m smart_transcriber --version
 ```
 
-## Quick Start
+The PyPI package and CLI are named `smart-transcriber` and `transcribe`, respectively. These changes are version **0.3.0 in this checkout**; installing an older published version will not provide this workflow. [FFmpeg installation](https://ffmpeg.org/download.html).
 
-```bash
-export OPENAI_API_KEY="sk-..."
-transcribe meeting.mp3
+## Choose the workflow
+
+```powershell
+# Interviews/meetings: two audio passes, transcript only
+transcribe interview.m4a --mode meeting --style transcript --no-analysis --glossary terms.txt --out interview.md
+
+# Full report: the same audio passes followed by optional text analysis
+transcribe meeting.wav --out notes.md --json-out notes.json
+
+# One pass when you only need text or only need audio-based speaker labels
+transcribe interview.m4a --mode text --prompt 'Technical interview about Kubernetes' --no-analysis
+transcribe meeting.wav --mode diarized --style transcript --no-analysis
 ```
 
-This produces `meeting.md` with a summary, decisions, action items, speaker-labeled transcript, and more.
+| Mode | Audio model(s) | Capabilities |
+|---|---|---|
+| `meeting` (default) | `gpt-transcribe` + `gpt-4o-transcribe-diarize` | Contextual wording plus native speakers/timing; conservative local reconciliation |
+| `text` | `gpt-transcribe` | Wording with vocabulary/context; no invented speakers or timestamps |
+| `diarized` | `gpt-4o-transcribe-diarize` | Native speaker labels and timed segments; no prompt/glossary support |
 
-## Requirements
+The existing full-report default is preserved: `--style report` runs analysis using configurable `--analysis-model gpt-6-astra`. Use `--style transcript --no-analysis` for later review without paying for summaries. Transcript style always skips analysis; `--style outline` is also available.
 
-- **Python 3.11+**
-- **OpenAI API key** — set `OPENAI_API_KEY` environment variable
-- **ffmpeg** — required for audio files larger than 25 MB (auto-detected)
+**Cost change:** meeting mode intentionally transcribes the audio twice. As checked September 17, 2026, the wording pass costs $0.0045/minute ($0.27/hour), **plus separate diarization and any analysis charges**. One-pass modes reduce processing. The tool retains API usage metadata; it does not estimate a fixed total bill. [Wording model pricing](https://developers.openai.com/api/docs/models/gpt-transcribe).
 
-Install ffmpeg: https://ffmpeg.org/download.html
+**Retirement:** `gpt-4o-transcribe-diarize` is scheduled for removal on **February 26, 2027**. Current OpenAI documentation does not establish an equivalent newer native diarization replacement. The dependency is explicit; availability errors never trigger an automatic model substitution or text-inferred speakers. [OpenAI deprecations](https://developers.openai.com/api/docs/deprecations#2026-08-26-transcription-models).
 
-## Usage
+## Technical terminology and known speakers
 
-```bash
-transcribe <audio_file> [options]
+`--glossary terms.txt` reads UTF-8, one term per line. Blank lines and duplicates are ignored; `<` and `>` are unsupported. Preserve meaningful spelling and punctuation, such as `kubectl`, `C++`, `C#`, and `.NET`. `--prompt` supplies recording context. Both go only to the wording model. Hints can bias recognition; use terms supported by the recording's context.
+
+```powershell
+transcribe interview.wav --glossary terms.txt --prompt 'Engineering interview with Jane about Kubernetes operations' --known-speaker 'Jane=jane-reference.wav' --style transcript --no-analysis
 ```
 
-### Examples
+Up to four distinct speaker names may have 2–10-second audio-only reference clips. No references are required. `--language en` is the default; `--language auto` omits the hint. The package maps the hint to `languages` for `gpt-transcribe` and `language` for diarization. Unsupported combinations fail before any audio API request. `--num-speakers` remains a legacy analysis hint, **not an audio diarization constraint**.
 
-```bash
-# Basic transcription with summary
-transcribe meeting.mp3
+## Saved work and reuse
 
-# Specify output path
-transcribe meeting.mp3 --out notes.md --json-out notes.json
+For `--out interview.md`, outputs are:
 
-# Outline style instead of report
-transcribe meeting.wav --style outline
+| Artifact | Contents |
+|---|---|
+| `interview.md` | Readable transcript or report |
+| `interview.transcript.json` | Reusable normalized transcript, provenance, native segment metadata and reconciliation records |
+| `interview.wording.txt` | Complete wording-pass alternative (meeting mode) |
+| `interview.review.md` | Accepted substitutions and unresolved differences (meeting mode) |
+| `<audio_stem>.transcribe/` | Durable work directory: immutable raw API responses, stage indexes, prepared audio, derived history, analysis results |
 
-# Use a different analysis model
-transcribe meeting.m4a --analysis-model gpt-5-mini
+The work directory defaults beside the Markdown output. Use `--work-dir output/interview-work` to keep it fixed when changing output locations. `--transcript-json` overrides the normalized export path; it is no longer a raw-response export. Original provider responses remain under the source-hash job's `raw/` directory, with paths recorded in transcript metadata. Historical reconciliations are retained under `derived/`; the readable exports show the latest result.
 
-# Transcription only (no summary/analysis)
-transcribe meeting.mp3 --no-analysis
+Completed stages are written atomically and reused when audio bytes, model, and relevant request settings match. Changing the glossary reruns **only wording**. Changing analysis settings never retranscribes matching audio. A failed analysis leaves both paid transcripts available. Resume with the same work directory **without `--force`**. An interrupted request with no returned response cannot be recovered; that one request may require processing again.
 
-# Re-analyze a saved transcript
-transcribe --analysis-only --transcript-input raw.json --out notes.md
+`--force` intentionally reprocesses active API stages and retains earlier originals/history. The CLI disables automatic SDK retries so a timeout does not silently repeat a potentially paid request. Avoid concurrent runs against the same job: caching is resumable but does not lock out duplicate in-flight requests. Saved artifacts contain recording content and should be handled like the recording itself.
 
-# Render wall-clock timestamps
-transcribe meeting.mp3 --start-time 09:30
+```powershell
+# Analyze an existing transcript; no audio calls
+transcribe --analysis-only --transcript-input interview.transcript.json --out notes.md
 
-# Provide hints for better results
-transcribe meeting.mp3 --num-speakers 4 --prompt "Acme Corp, Project Phoenix"
+# Render saved JSON locally, without an API key
+transcribe --render-only --transcript-input notes.json --style transcript --out review-copy.md
+
+# Validate configuration and inspect media without API calls or output writes
+transcribe interview.wav --mode meeting --glossary terms.txt --dry-run
 ```
 
-### Options
+Imports accept older combined `{meta, analysis, transcript}` JSON, flat transcript exports, and raw transcription JSON. Existing files are not migrated or deleted. Imported legacy text-inferred speaker assignments are explicitly marked as unverified. Use a different output path to preserve an older human-edited report; explicit output paths are replaced atomically. Inputs cannot be overwritten by outputs.
 
-| Option | Default | Description |
-|--------|---------|-------------|
-| `audio_file` | — | Path to audio file (extension auto-detected) |
-| `--out` | `<audio_stem>.md` | Markdown output path |
-| `--json-out` | — | JSON output (analysis + transcript) |
-| `--transcript-json` | — | Save raw transcription JSON |
-| `--transcribe-model` | `whisper-1` | Transcription model |
-| `--analysis-model` | `gpt-5.2` | Analysis/summary model |
-| `--language` | `en` | Language hint for transcription |
-| `--num-speakers` | — | Speaker count hint |
-| `--prompt` | — | Transcription prompt (names, jargon) |
-| `--style` | `report` | Output style: `report` or `outline` |
-| `--include-metadata` | off | Show metadata in outline style |
-| `--disclaimer` | — | Disclaimer text at top of notes |
-| `--no-analysis` | off | Skip analysis, transcribe only |
-| `--analysis-only` | off | Skip transcription, analyze saved JSON |
-| `--transcript-input` | — | JSON input for `--analysis-only` |
-| `--chunk-seconds` | `600` | Chunk length for large files |
-| `--merge-gap-seconds` | `2` | Max gap to merge same-speaker segments |
-| `--max-merge-seconds` | `45` | Max duration per merged line |
-| `--max-merge-words` | `80` | Max words per merged line |
-| `--start-time` | — | Render wall-clock timestamps (HH:MM or HH:MM:SS) |
+## Reconciliation and audio preparation
 
-## How It Works
+The diarization response supplies authoritative speaker IDs and segment times. The companion transcript can supply alternative wording, never a new speaker or word timestamp. Only 1–4-token substitutions wholly inside one native segment, with unique exact context on both sides, are eligible for automatic incorporation. Punctuation is retained. The originals and all change records remain available.
 
-The tool makes two OpenAI API calls per file:
+Numbers/versions (including common English number words), negations, insertions, deletions, overlapping speech, speaker boundaries, and ambiguous/repeated context remain unchanged and go into the review report. These are conservative heuristics, not a semantic guarantee for every language. Alignment has token/work limits; if exceeded or reconciliation fails, the native transcript remains usable with a review flag.
 
-1. **Transcription** — audio → text with timestamps (Whisper API)
-2. **Analysis** — text → structured summary, speaker labels, decisions, action items (Chat API)
+**Needs validation:** two passes provide complementary evidence, not proof of better wording. No representative recording has yet been compared against a human-checked reference. Evaluate terminology errors, speaker attribution, unresolved changes, and total cost on a representative excerpt before describing the derived transcript as more accurate.
 
-For large files (>25 MB), audio is automatically split into chunks using ffmpeg, transcribed separately, and merged.
+Supported audio under the conservative 24,000,000-byte upload ceiling is sent whole. Other formats/video are converted to lossless audio-only FLAC while preserving channels and sample rate. Large audio is split only if a whole upload remains too large; every chunk's size is checked. Offsets come from the original audio timeline, including silence. Unidentified speakers across separate uploads are named `chunk_1:A`, `chunk_2:A`, etc.; matching letters do not establish identity. Reference-backed names can span chunks. Multiple audio tracks require choosing/exporting the intended track first.
 
-## Performance
+`--chunk-seconds` (default 600) caps necessary chunks, not all recordings. Display merging uses `--merge-gap-seconds 2`, `--max-merge-seconds 45`, and `--max-merge-words 80`. It retains native identities and does not merge overlapping segments. `--start-time 09:30` renders wall-clock times. See `transcribe --help` for all options.
 
-Expect processing time to scale with audio duration. For faster results:
+## Codex skill and maintenance
 
-```bash
-# Use a smaller analysis model
-transcribe meeting.mp3 --analysis-model gpt-5-mini
+The maintained skill source lives in [`skills/transcribe`](skills/transcribe/SKILL.md). The installed personal skill at `C:\Users\Ben\.codex\skills\transcribe` now calls this package using the project virtual environment. Its old `scripts/transcribe_diarize.py` entry point is a thin launcher for `smart_transcriber.compat`, preserving old one-pass arguments and local text/JSON export. Legacy `--chunking-strategy` supports only `auto`; custom strategies are rejected. `SMART_TRANSCRIBER_PYTHON` can select another interpreter with the package installed.
 
-# Skip analysis entirely
-transcribe meeting.mp3 --no-analysis
+Skill guidance selects capabilities before models, defaults to transcript-only output for transcription requests, and checks current documentation when asked for best/latest models, when requirements change, or when availability fails. Package code owns requests, chunking, caching and reconciliation. Keep repository and installed skill copies synchronized when editing the skill. Existing skill icons and license are retained.
+
+Research checked **2026-09-17**: [transcription guide](https://developers.openai.com/api/docs/guides/speech-to-text), [request reference](https://developers.openai.com/api/reference/resources/audio/subresources/transcriptions/methods/create), [diarization model](https://developers.openai.com/api/docs/models/gpt-4o-transcribe-diarize), [analysis model](https://developers.openai.com/api/docs/models/gpt-6-astra). The current guide recommends `gpt-transcribe` for recorded wording; native speaker metadata still needs the diarization model. General audio chat is not a documented drop-in replacement for that response contract. See the [dated capability notes](skills/transcribe/references/api.md).
+
+## Development
+
+```powershell
+python -m pytest tests/ -v
+python -m pip install build
+python -m build
+transcribe --version
+transcribe --help
 ```
+
+Tests use mock API responses/HTTP transport and generated audio, with no paid requests. FFmpeg tests require ffmpeg/ffprobe and run in CI. API account/model availability and recording accuracy need live validation separately.
 
 ## License
 
-[MPL 2.0](LICENSE)
+[MPL 2.0](LICENSE). The bundled Codex skill retains its [original license](skills/transcribe/LICENSE.txt).

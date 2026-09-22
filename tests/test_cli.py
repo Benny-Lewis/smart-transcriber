@@ -27,16 +27,17 @@ class TestCliSmoke:
         from smart_transcriber import __version__
         assert __version__ in result.stdout
 
-    def test_missing_api_key_exits_one(self):
+    def test_invalid_input_checked_before_credentials(self):
         env = os.environ.copy()
         env.pop("OPENAI_API_KEY", None)
         result = run_cli("nonexistent.mp3", env=env)
         assert result.returncode == 1
-        assert "OPENAI_API_KEY" in result.stderr
+        assert "Audio file not found" in result.stderr
 
-    def test_style_transcript_with_no_analysis_exits_one(self):
+    def test_style_transcript_with_no_analysis_is_allowed(self):
         env = os.environ.copy()
         env["OPENAI_API_KEY"] = "dummy"
         result = run_cli("nonexistent.mp3", "--style", "transcript", "--no-analysis", env=env)
         assert result.returncode == 1
-        assert "cannot combine" in result.stderr.lower()
+        assert "Audio file not found" in result.stderr
+        assert "cannot combine" not in result.stderr.lower()

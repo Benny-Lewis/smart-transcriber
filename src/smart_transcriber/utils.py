@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 
-MAX_UPLOAD_BYTES = 26_214_400
+MAX_UPLOAD_BYTES = 24_000_000
 DEFAULT_CHUNK_SECONDS = 600
 DEFAULT_AUDIO_EXTS = [
     ".wav",

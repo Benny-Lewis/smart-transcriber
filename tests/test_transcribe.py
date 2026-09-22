@@ -69,9 +69,9 @@ class TestMergeTranscripts:
         assert len(result["segments"]) == 2
         assert result["segments"][0]["start"] == 0.0
         assert result["segments"][0]["end"] == 5.0
-        # Second chunk offset by first chunk's last end (5.0)
-        assert result["segments"][1]["start"] == 5.0
-        assert result["segments"][1]["end"] == 8.0
+        # Silence in the first chunk must not shift all subsequent timestamps.
+        assert result["segments"][1]["start"] == 600.0
+        assert result["segments"][1]["end"] == 603.0
 
     def test_no_segments_uses_chunk_seconds_for_offset(self):
         transcripts = [

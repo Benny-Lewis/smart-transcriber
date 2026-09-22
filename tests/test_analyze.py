@@ -1,8 +1,44 @@
 """Tests for smart_transcriber.analyze."""
 
 import json
+from types import SimpleNamespace
+
+import pytest
 
 from smart_transcriber.analyze import AnalysisResult, build_analysis_prompt
+from smart_transcriber.analyze import analyze_transcript, validate_analysis
+
+
+@pytest.mark.parametrize("value", [[], {"meta": {"participants": 5}}, {"sections": [{"heading": 7}]},
+    {"meta": {"topics": [1]}}, {"qa": [{"answers": "wrong"}]}, {"annotations": [{"note": {}}]},
+    {"annotations": [{"timestamp": "inf"}]}])
+def test_invalid_nested_analysis_is_rejected(value):
+    with pytest.raises(ValueError):
+        validate_analysis(value)
+
+
+def test_malformed_paid_analysis_is_saved_before_parsing():
+    from openai.types.chat import ChatCompletion
+    response = ChatCompletion(id="fixture", created=0, model="test", object="chat.completion",
+        choices=[{"index": 0, "finish_reason": "stop", "message": {"role": "assistant", "content": "not valid json"}}])
+    client = SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=lambda **kwargs: response)))
+    saved = []
+    with pytest.raises(ValueError):
+        analyze_transcript(client, "test", {}, save_response=saved.append)
+    assert saved[0]["choices"][0]["message"]["content"] == "not valid json"
+
+
+def test_analysis_never_reassigns_native_speakers():
+    response = SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content=json.dumps({
+        "summary": "Summary", "speakers": [{"label": "invented"}, {"label": "A"}],
+        "annotations": [{"speaker": "Alice", "note": "Unsupported identity"}, {"speaker": "A", "note": "Known ID"}],
+        "segment_speakers": [{"segment_index": 0, "speaker": "invented"}]})))])
+    client = SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=lambda **kwargs: response)))
+    result = analyze_transcript(client, "test", {"segments": [{"index": 0, "speaker": "A"}, {"index": 1}]})
+    assert result["segment_speakers"] == [{"segment_index": 0, "speaker": "A"}]
+    assert result["speakers"] == [{"label": "A"}]
+    assert result["annotations"][0]["speaker"] is None
+    assert result["annotations"][1]["speaker"] == "A"
 
 
 class TestAnalysisResultTypedDict:
